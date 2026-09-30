@@ -1,0 +1,20 @@
+[general]
+name=QGIS_Transformer_Studio_V1
+qgisMinimumVersion=4.2
+qgisMaximumVersion=4.99
+description=Visual GIS ETL workflow builder with typed readers, transformers and writers for QGIS.
+about=QGIS Transformer Studio is an FME-inspired visual GIS ETL workflow builder for QGIS 4.x. Build reusable workflows by connecting typed Reader, Geometry, Attribute, CRS, Raster and Writer transformers on a visual canvas. The project is designed around native PyQGIS and QGIS Processing functionality, with validation, branching, workflow save/load, execution logging and standalone Processing algorithms.
+version=0.2.3
+author=Viduthalai Muthu M
+email=viduthalaimuthu5@gmail.com
+category=Processing
+experimental=True
+deprecated=False
+hasProcessingProvider=yes
+icon=icon.svg
+homepage=https://github.com/ViduthalaiMuthu/QGIS-Plugins
+repository=https://github.com/ViduthalaiMuthu/QGIS-Plugins
+tracker=https://github.com/ViduthalaiMuthu/QGIS-Plugins/issues
+tags=processing,etl,workflow,transformer,vector,raster,geometry,automation
+license=GPL-2.0-or-later
+license_file=LICENSE
