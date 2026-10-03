@@ -1,4 +1,4 @@
-# QGIS_Transformer_Studio_V2 — 2.0.0
+# QGIS_Transformer_Studio_V2 — 2.0.3
 
 Visual GIS ETL workflow builder for QGIS 4.2+.
 
