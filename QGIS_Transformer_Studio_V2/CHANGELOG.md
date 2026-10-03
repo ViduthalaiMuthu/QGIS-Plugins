@@ -1,5 +1,15 @@
 # Changelog
 
+
+## 2.0.3
+- Hardened workflow execution and Processing parameter validation for QGIS 4.2+.
+- Improved transformer deletion and connection deletion handling.
+- Improved GeoPackage output handling for Parcel Downloader.
+- Added safer output-path and file-finalization handling.
+- Improved compatibility with QGIS Processing parameter variations.
+- Updated documentation and release metadata for the 2.0.3 stable release.
+
+
 ## 2.0.2
 - Hardened GeoPackage output using a sibling temporary GeoPackage before final replacement.
 - Preserves completed Parcel Downloader data when the requested output is locked.
