@@ -1,13 +1,22 @@
 # Changelog
 
+## 2.0.4
+
+- Resolved QGIS plugin security scanner findings in the workflow engine.
+- Replaced silent exception suppression with explicit diagnostic handling.
+- Removed broad `try/except/continue` and `try/except/pass` patterns flagged by Bandit.
+- Restricted Parcel Downloader FeatureServer requests to `http` and `https` URL schemes.
+- Improved logging for recoverable Processing and output-layer handling errors.
+
 
 ## 2.0.3
+
 - Hardened workflow execution and Processing parameter validation for QGIS 4.2+.
 - Improved transformer deletion and connection deletion handling.
 - Improved GeoPackage output handling for Parcel Downloader.
 - Added safer output-path and file-finalization handling.
 - Improved compatibility with QGIS Processing parameter variations.
-- Updated documentation and release metadata for the 2.0.3 stable release.
+- Updated documentation and release metadata for the stable 2.0.3 release.
 
 
 ## 2.0.2

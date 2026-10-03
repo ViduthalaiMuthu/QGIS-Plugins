@@ -238,7 +238,7 @@ class Studio(QMainWindow):
         self.view=WorkflowView(self.scene,self); self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag); self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse); center.addWidget(self.view,1)
         self.log=QTextEdit(); self.log.setReadOnly(True); self.log.setMaximumHeight(150); center.addWidget(self.log); main.addLayout(center,1)
         self.status=QLabel("Ready — 100+ real QGIS Processing transformers + Web/API + Parcel Downloader."); center.addWidget(self.status)
-        self.log.append("QGIS Transformer Studio V2.0.3 loaded.")
+        self.log.append("QGIS Transformer Studio V2.0.4 loaded.")
     def populate(self):
         self.list.clear()
         for s in TRANSFORMER_CATALOG:

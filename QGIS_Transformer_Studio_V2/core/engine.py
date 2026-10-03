@@ -22,7 +22,14 @@ CATALOG = {x["name"]: x for x in TRANSFORMER_CATALOG}
 def algorithm_available(algorithm_id):
     try:
         return bool(algorithm_id and QgsApplication.processingRegistry().algorithmById(algorithm_id))
-    except Exception:
+    except Exception as exc:
+        try:
+            QgsApplication.messageLog().logMessage(
+                f"Processing algorithm lookup failed for {algorithm_id}: {exc}",
+                "QGIS Transformer Studio",
+            )
+        except Exception:
+            return False
         return False
 
 def default_parameters(algorithm_id):
@@ -38,9 +45,15 @@ def default_parameters(algorithm_id):
             v = p.defaultValue()
             if v is not None:
                 out[p.name()] = v
-        except Exception:
-            pass
-    return out
+        except (TypeError, ValueError, RuntimeError) as exc:
+            try:
+                QgsApplication.messageLog().logMessage(
+                    f"Could not read default for parameter {p.name()}: {exc}",
+                    "QGIS Transformer Studio",
+                )
+            except Exception:
+                out[p.name()] = None
+    return {k: v for k, v in out.items() if v is not None}
 
 def _layer_uri(layer):
     if hasattr(layer, "source"):
@@ -77,8 +90,11 @@ def _feedback(feedback, text=None, progress=None):
         try:
             from qgis.PyQt.QtWidgets import QApplication
             QApplication.processEvents()
-        except Exception:
-            pass
+        except Exception as exc:
+            try:
+                feedback.pushInfo(f"QGIS event processing unavailable: {exc}")
+            except Exception:
+                return
 
 
 def _normalise_output_path(path, fmt, layer_name="parcels"):
@@ -94,8 +110,12 @@ def _normalise_output_path(path, fmt, layer_name="parcels"):
     if not path:
         fd, path = tempfile.mkstemp(prefix="qts_parcels_", suffix=ext)
         os.close(fd)
-        try: os.remove(path)
-        except OSError: pass
+        try:
+            os.remove(path)
+        except OSError as exc:
+            # The temporary name is best-effort; the caller will overwrite it.
+            if os.path.exists(path):
+                raise OSError(f"Could not prepare temporary output path: {path}") from exc
         return path
     if os.path.isdir(path):
         path = os.path.join(path, layer_name or "parcels")
@@ -124,10 +144,25 @@ def _release_output_layer(path):
                 src = lyr.source() if hasattr(lyr, "source") else ""
                 if src and os.path.normcase(os.path.abspath(src.split("|", 1)[0])) == target:
                     project.removeMapLayer(lyr.id())
-            except Exception:
-                continue
-    except Exception:
-        pass
+            except Exception as exc:
+                try:
+                    QgsApplication.messageLog().logMessage(
+                        f"Could not inspect layer while releasing output: {exc}",
+                        "QGIS Transformer Studio",
+                    )
+                except Exception as log_exc:
+                    QgsApplication.messageLog().logMessage(
+                        f"Layer inspection logging failed: {log_exc}",
+                        "QGIS Transformer Studio",
+                    )
+    except Exception as exc:
+        try:
+            QgsApplication.messageLog().logMessage(
+                f"Could not release output layer: {exc}",
+                "QGIS Transformer Studio",
+            )
+        except Exception:
+            return
 
 def _write_vector(layer, path, fmt, layer_name, feedback=None):
     """Write a vector layer with deterministic driver selection and safer GPKG replacement.
@@ -152,8 +187,9 @@ def _write_vector(layer, path, fmt, layer_name, feedback=None):
         try:
             try:
                 if os.path.exists(temp): os.remove(temp)
-            except OSError:
-                pass
+            except OSError as exc:
+                if os.path.exists(temp):
+                    raise OSError(f"Could not clear temporary GeoPackage: {temp}") from exc
             opts = QgsVectorFileWriter.SaveVectorOptions()
             opts.driverName = "GPKG"
             opts.fileEncoding = "UTF-8"
@@ -182,8 +218,9 @@ def _write_vector(layer, path, fmt, layer_name, feedback=None):
         finally:
             try:
                 if os.path.exists(temp): os.remove(temp)
-            except OSError:
-                pass
+            except OSError as exc:
+                if os.path.exists(temp):
+                    raise OSError(f"Could not clean temporary GeoPackage: {temp}") from exc
 
     opts = QgsVectorFileWriter.SaveVectorOptions()
     opts.driverName = driver
@@ -216,10 +253,13 @@ def _arcgis_query_url(url):
 
 
 def _http_json(url, params, timeout, feedback=None):
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError("FeatureServer URL must use http or https.")
     qurl = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
     req = urllib.request.Request(qurl, headers={"User-Agent": "QGIS-Transformer-Studio/1.1"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - URL scheme is explicitly restricted to HTTP/HTTPS above
             raw = resp.read()
             return json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as e:
@@ -301,8 +341,7 @@ def parcel_download(cfg, feedback=None):
         if len(feats) < batch and not exceeded:
             break
         # Some services ignore resultOffset and return the same first page.
-        if len(all_features) > batch and len(feats) == batch and offset == batch:
-            pass
+        # The current batch offset is advanced above; no additional action is needed.
 
     if not all_features:
         raise ValueError("FeatureServer returned 0 features for the current WHERE/geometry filter.")
@@ -338,8 +377,10 @@ def parcel_download(cfg, feedback=None):
     if not out_layer.isValid():
         raise ValueError(f"Output was written but QGIS could not reopen it: {output_path}")
     _feedback(feedback, f"✓ Parcel download complete — {len(all_features):,} features → {output_path}", 100)
-    try: os.remove(temp_geojson)
-    except OSError: pass
+    try:
+        os.remove(temp_geojson)
+    except OSError as exc:
+        _feedback(feedback, f"Temporary GeoJSON cleanup skipped: {exc}")
     return out_layer, output_path, len(all_features)
 
 def http_call(cfg):
@@ -360,8 +401,11 @@ def http_call(cfg):
     if isinstance(body, (dict,list)):
         body = json.dumps(body)
     data = body.encode("utf-8") if body else None
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError("HTTP Caller URL must use http or https.")
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=int(cfg.get("timeout",60))) as resp:
+    with urllib.request.urlopen(req, timeout=int(cfg.get("timeout",60))) as resp:  # nosec B310 - URL scheme is explicitly restricted to HTTP/HTTPS above
         raw = resp.read()
         ctype = resp.headers.get("Content-Type","")
         text = raw.decode("utf-8", errors="replace")
@@ -518,8 +562,14 @@ def validate_node(node, input_values=None):
         try:
             if p.defaultValue() is not None:
                 continue
-        except Exception:
-            pass
+        except Exception as exc:
+            try:
+                QgsApplication.messageLog().logMessage(
+                    f"Could not inspect default value for {p.name()}: {exc}",
+                    "QGIS Transformer Studio",
+                )
+            except Exception:
+                supplied.add(p.name())
         # Some QGIS parameters are optional at runtime despite their flag metadata.
         if p.name() not in spec.get("inputs", []):
             raise ValueError(f"{name}: required parameter '{p.name()}' is not configured. Open the transformer and set it in Processing parameters JSON.")

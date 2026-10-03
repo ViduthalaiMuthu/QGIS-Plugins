@@ -22,8 +22,13 @@ class QGISTransformerStudioPlugin:
             self.action.deleteLater()
         if self.provider:
             from qgis.core import QgsApplication
-            try: QgsApplication.processingRegistry().removeProvider(self.provider)
-            except Exception: pass
+            try:
+                QgsApplication.processingRegistry().removeProvider(self.provider)
+            except Exception as exc:
+                QgsApplication.messageLog().logMessage(
+                    f"Could not remove Processing provider during unload: {exc}",
+                    "QGIS Transformer Studio",
+                )
             self.provider=None
         if self.window:
             self.window.close()
